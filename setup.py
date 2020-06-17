@@ -11,11 +11,12 @@ about = {}
 with open(os.path.join(here, 'vmtreport', '__about__.py'), 'r', 'utf-8') as fp:
     exec(fp.read(), about)
 
-with open(os.path.join(here, 'README.rst'), 'r', 'utf-8') as fp:
+with open(os.path.join(here, 'README.md'), 'r', 'utf-8') as fp:
     readme = fp.read()
 
 requires = [
     'requests>=2.21.0',
+    'vmtconnect>=3.2.3',
     'arbiter>=1.0.0'
 ]
 
