@@ -32,7 +32,7 @@ __all__ = [
 
 
 
-class VmtConnection(arbiter.handlers.ConnectionHandler):
+class VmtConnection(arbiter.handlers.HttpHandler):
     """vmt-connect Handler for arbiter
 
     Provides a vmt-connect :py:class:`~vmtconnect.Connection` object for use as
@@ -48,7 +48,16 @@ class VmtConnection(arbiter.handlers.ConnectionHandler):
 
         disable_warnings(InsecureRequestWarning)
 
-        return vc.Connection(self.hostname, auth=arbiter.get_auth(self.authentication))
+        __auth = arbiter.get_auth(self.authentication)
+        
+        if 'auth' in __auth:
+            return vc.Connection(self.host, auth=__auth['auth'])
+        elif 'username' in __auth and 'password' in __auth:
+            return vc.Connection(self.host,
+                                 username=__auth['username'],
+                                 password=__auth['password'])
+        else:
+            raise TypeError('Unknown authorization object returned.')
 
 
 
