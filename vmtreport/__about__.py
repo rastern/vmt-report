@@ -13,7 +13,7 @@
 
 __title__ = 'vmtreport'
 __description__ = 'Turbonomic Report Interface'
-__version__ = '1.0.1.dev1'
+__version__ = '1.0.1'
 __author__ = 'R.A. Stern'
 __author_email__ = 'richard.stern@turbonomic.com'
 __license__ = 'Apache 2.0'
