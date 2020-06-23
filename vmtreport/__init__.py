@@ -49,22 +49,23 @@ class VmtConnection(arbiter.handlers.HttpHandler):
         disable_warnings(InsecureRequestWarning)
 
         __auth = arbiter.get_auth(self.authentication)
+
+        if isinstance(__auth, dict):
+            if 'auth' in __auth:
+                return vc.Connection(self.host, auth=__auth['auth'])
+            elif 'username' in __auth and 'password' in __auth:
+                return vc.Connection(self.host,
+                                     username=__auth['username'],
+                                     password=__auth['password'])
         
-        if 'auth' in __auth:
-            return vc.Connection(self.host, auth=__auth['auth'])
-        elif 'username' in __auth and 'password' in __auth:
-            return vc.Connection(self.host,
-                                 username=__auth['username'],
-                                 password=__auth['password'])
-        else:
-            raise TypeError('Unknown authorization object returned.')
+        raise TypeError('Unknown authorization object returned.')
 
 
 
 def auth_credstore(obj):
     from turbo_api_creds import TurboCredStore
 
-    return TurboCredStore().decrypt(obj['credential'], obj['keyfile'])
+    return {'auth': TurboCredStore().decrypt(obj['credential'], obj['keyfile'])}
 
 
 
