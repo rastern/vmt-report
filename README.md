@@ -36,8 +36,7 @@ def actions(source, config, logger):
     return [{x: res[x]} for x in res if x in fields]
 
 if __name__ == '__main__':
-  config = arbiter.load('report.config')
-  report = arbiter.Process(config, actions)
+  report = arbiter.Process('report.config', actions)
   report.run()
 ```
 
