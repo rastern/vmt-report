@@ -1,9 +1,8 @@
 # vmt-report: Reporting Helper
 
-*vmt-report* adds Turbonomic specific handlers for the [arbiter](https://github.com/rastern/arbiter) data handling
-package. This enabled Turbonomic API calls to be easily combined and manipulated
-into standardized output formats such as CSV, and JSON for data export or simple
-reporting needs.
+*vmt-report* adds Turbonomic specific handlers for the [arbiter](https://github.com/rastern/arbiter) data handling package. This enabled Turbonomic API calls to be
+easily combined and manipulated into standardized output formats such as CSV,
+and JSON for data export or simple reporting needs.
 
 
 ## Installation
@@ -15,9 +14,8 @@ pip install vmtreport
 ## Usage
 
 *vmt-report* installs the appropriate ``vmtconnect`` and ``credstore`` handlers for
-connecting to Turbonomic instances using [vmt-connect](https://turbonomic.github.io/vmt-connect/start.html).
-The JSON config controls most of the behavior of *arbiter*, while the process
-worker handles data manipulation.
+connecting to Turbonomic instances using [vmt-connect](https://turbonomic.github.io/vmt-connect/start.html). The JSON config controls most of the behavior of *arbiter*,
+while the process worker handles data manipulation.
 
 
 #### Example Script (example.py)
