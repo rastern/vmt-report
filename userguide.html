@@ -1,0 +1,517 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>User Guide &mdash; vmt-report 1.1.0 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="reference.html" />
+    <link rel="prev" title="Getting Started" href="start.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> vmt-report
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">User Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">arbiter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cluster-group-based-reports">Cluster &amp; Group Based Reports</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#groups">Groups</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fields">Fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sorting">Sorting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-use-cases">Advanced Use Cases</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#connection-handler">Connection Handler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#credstore-authentication">Credstore Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#custom-workers">Custom Workers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">API Reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">vmt-report</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>User Guide</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/userguide.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="user-guide">
+<h1>User Guide<a class="headerlink" href="#user-guide" title="Permalink to this headline">¶</a></h1>
+<p><em>vmt-report</em> provides two handlers for the <a class="reference external" href="https://pypi.org/project/arbiter/">arbiter</a> Python package, enabling
+<a class="reference external" href="http://www.turbonomic.com">Turbonomic</a> data to be easily utilized in custom data workflows, reports,
+and data handling tasks</p>
+<div class="section" id="id1">
+<h2>arbiter<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p><em>vmt-report</em> is an extension to arbiter, providing interfaces to Turbonomic.
+A basic understanding of arbiter is necessary to be successful with <em>vmt-report</em>,
+though one does not need to have mastered the dependency by any means.</p>
+<p>The heart of arbiter is the <a class="reference external" href="https://arbiter.readthedocs.io/en/latest/reference.html#arbiter.Process" title="(in arbiter v1.1.0)"><code class="xref py py-class docutils literal notranslate"><span class="pre">arbiter.Process</span></code></a> class, which consumes
+a <a class="reference external" href="https://arbiter.readthedocs.io/en/latest/userguide.html#configuration">configuration</a>
+file defining handlers and directives. Basically a config telling the processor
+what data to input, and what to output, along with some possible notifications
+to send. A minimum working example for converting a CSV file to a JSON file may
+look like this:</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text">example.py</span><a class="headerlink" href="#id2" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">arbiter</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+  <span class="n">report</span> <span class="o">=</span> <span class="n">arbiter</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="s1">&#39;report.conf&#39;</span><span class="p">)</span>
+  <span class="n">report</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text">report.conf</span><a class="headerlink" href="#id3" title="Permalink to this code">¶</a></div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;sources&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;handler&quot;</span><span class="p">:</span> <span class="s2">&quot;CSV&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;resource&quot;</span><span class="p">:</span> <span class="s2">&quot;file:./input.csv&quot;</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;outputs&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;handler&quot;</span><span class="p">:</span> <span class="s2">&quot;JSON&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;resource&quot;</span><span class="p">:</span> <span class="s2">&quot;file:./output.json&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;keepfile&quot;</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;logging&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;DEBUG&quot;</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;report_timeout&quot;</span><span class="p">:</span> <span class="mi">60</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p>Handlers are free to define their own configuration parameters, and the documentation
+for the specific handler being used should be consulted for such information.
+The two handlers <em>vmt-report</em> defines, <a class="reference internal" href="reference.html#vmtreport.GroupedData" title="vmtreport.GroupedData"><code class="xref py py-class docutils literal notranslate"><span class="pre">GroupedData</span></code></a> and
+<a class="reference internal" href="reference.html#vmtreport.Connection" title="vmtreport.Connection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Connection</span></code></a>, are documented.</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+</div>
+<div class="section" id="cluster-group-based-reports">
+<h2>Cluster &amp; Group Based Reports<a class="headerlink" href="#cluster-group-based-reports" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="reference.html#vmtreport.GroupedData" title="vmtreport.GroupedData"><code class="xref py py-class docutils literal notranslate"><span class="pre">GroupedData</span></code></a> provides basic data processing
+capabilities based on groups (including clusters) within Turbonomic. The handler
+utilizes a list of groups, and a list of field definitions. Optionally a third
+list of sorting parameters may be included. The resultant data is a mapped dataset
+represented by an <a class="reference external" href="https://docs.python.org/3/library/collections.html#collections.OrderedDict" title="(in Python v3.8)"><code class="xref py py-class docutils literal notranslate"><span class="pre">collections.OrderedDict</span></code></a>.</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text">Example cluster based report config</span><a class="headerlink" href="#id4" title="Permalink to this code">¶</a></div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;sources&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;handler&quot;</span><span class="p">:</span> <span class="s2">&quot;VmtGroupedDataHandler&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;resource&quot;</span><span class="p">:</span> <span class="s2">&quot;https://hostname&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;authentication&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;env&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;username&quot;</span><span class="p">:</span> <span class="s2">&quot;VMT_USERNAME&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;password&quot;</span><span class="p">:</span> <span class="s2">&quot;VMT_PASSWORD&quot;</span>
+      <span class="p">},</span>
+      <span class="nt">&quot;options&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;groups&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;cluster&quot;</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;fields&quot;</span><span class="p">:</span> <span class="p">[</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;target&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;property&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;source:displayName&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;vCenter&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;cluster&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;property&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;displayName&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Cluster Name&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;numpm&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;numHosts:value&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Num Hosts&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;numvm&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;numVMs:value&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Num VMs&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;cpuutil&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;computed&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;round($cpuused/$cpucap * 100, 2)&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;CPU Util&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;memutil&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;computed&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;round($memused/$memcap * 100, 2)&quot;</span><span class="p">,</span> <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Mem Util&quot;</span><span class="p">},</span>
+
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;cpucap&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;CPU:capacity:total&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;cpuused&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;CPU:values:total&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;memcap&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;Mem:capacity:total&quot;</span><span class="p">},</span>
+          <span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;memused&quot;</span><span class="p">,</span> <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;commodity&quot;</span><span class="p">,</span> <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;Mem:values:total&quot;</span><span class="p">}</span>
+        <span class="p">],</span>
+        <span class="nt">&quot;sortby&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;target&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster&quot;</span><span class="p">]</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;outputs&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;handler&quot;</span><span class="p">:</span> <span class="s2">&quot;CSV&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;resource&quot;</span><span class="p">:</span> <span class="s2">&quot;file:/tmp/{timestamp}-clusters.csv&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;keepfile&quot;</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;logging&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;DEBUG&quot;</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;report_timeout&quot;</span><span class="p">:</span> <span class="mi">60</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="groups">
+<h3>Groups<a class="headerlink" href="#groups" title="Permalink to this headline">¶</a></h3>
+<p>Groups define the scope within Turbonomic to limit data gathering to. Two types of
+groups are supported: <em>cluster</em> and <em>group</em>. Clusters are distinguished because
+Turbonomic treats these separate from all other entities internally. When using
+the <em>cluster</em> type, the default behavior is to use all clusters unless a <strong>names</strong>
+filter is provided; when using the type <em>group</em> a <strong>names</strong> filter must be provided.
+Groups are defined in the <strong>groups</strong> sub-block of the configuration.</p>
+<dl class="simple">
+<dt><code class="xref py py-attr docutils literal notranslate"><span class="pre">Parameters:</span></code></dt><dd><dl class="field-list simple">
+<dt class="field-odd">type</dt>
+<dd class="field-odd"><p>Specifies if the intended scope objects are Turbo groups or clusters.</p>
+</dd>
+<dt class="field-even">names</dt>
+<dd class="field-even"><p>List of names / uuids to limit the scope to.</p>
+</dd>
+<dt class="field-odd">stop_on_error</dt>
+<dd class="field-odd"><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, non-existent or groups that produce errors will
+be raised as an exception. By default errors are ignored. Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+<div class="section" id="fields">
+<h3>Fields<a class="headerlink" href="#fields" title="Permalink to this headline">¶</a></h3>
+<p>Fields provide <em>vmt-report</em> with detailed information regarding which data to
+gather, and how to make use of it in the final output. All field definitions
+must contain a unique <strong>id</strong>, a valid <strong>type</strong>, and a valid <strong>value</strong>. The <strong>label</strong>
+parameter controls if the field is included in final output, thus you may declare
+fields as required for use in calculations, that are then excluded from the final
+report. This is a critical feature for computed fields, as they themselves cannot
+directly reference commodities or properties on entities.</p>
+<p>Computed fields permit custom calculations upon report data, storing the data
+into the field for use by other computed fields, or for display in the report.
+The <strong>value</strong> may contain most any valid python expression that evaluates to a
+value; and explicitly excludes the use of assignment operators. Functions may
+also be called provided they do not require external input and return a value.
+Other fields may be referenced by prefixing the field <strong>id</strong> with a <code class="docutils literal notranslate"><span class="pre">$</span></code>. All
+other field data is populated prior to the processing of computed fields, thus
+field order is not typically an issue for computed fields in general. However,
+if a computed field references another computed field, the referenced field must
+appear earlier in the list than the field referencing it so that the referenced
+field is computed before its value is required. Computed fields are evaluated in
+sequential order starting at the top of the list.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><em>vmt-report</em> does not check for field order dependency or circular dependency
+errors.</p>
+</div>
+<p>Fields are defined in the <strong>fields</strong> sub-block of the configuration as a list of
+dictionaries with the following parameters.</p>
+<dl class="simple">
+<dt><code class="xref py py-attr docutils literal notranslate"><span class="pre">Parameters:</span></code></dt><dd><dl class="field-list simple">
+<dt class="field-odd">id</dt>
+<dd class="field-odd"><p>Unique, user supplied internal identifier for the id. This is used when
+referencing other fields in calculated fields, and the field must contain
+only alphanumeric characters.</p>
+</dd>
+<dt class="field-even">type</dt>
+<dd class="field-even"><p>One of the the defined FieldTypes, as a string literal: commodity,
+computed, property, or string.</p>
+</dd>
+<dt class="field-odd">value</dt>
+<dd class="field-odd"><p>The value. This differs by type, and is discussed in detail below.</p>
+</dd>
+<dt class="field-even">label</dt>
+<dd class="field-even"><p>Optional. The column header to use in the final output.</p>
+</dd>
+</dl>
+</dd>
+<dt>Values by type:</dt><dd><ul class="simple">
+<li><p>commodity - colon separated path to the statistical value, prefixed by the
+commodity name.</p></li>
+<li><p>computed - the expression to evaluate</p></li>
+<li><p>property - colon separated path to the entity property</p></li>
+<li><p>string - string literal value which is not interpreted further. An empty string
+is valid.</p></li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="sorting">
+<h3>Sorting<a class="headerlink" href="#sorting" title="Permalink to this headline">¶</a></h3>
+<p>Final output may be sorted using the <strong>sortby</strong> option, by supplying a list of
+field <strong>ids</strong>. Multi-level sorting is supported, and proceeds left-to-right in
+the field list. Fields are sorted in ascending order by default, and any field
+may independently be reversed to descending order by prefixing the <strong>id</strong> with a
+<code class="docutils literal notranslate"><span class="pre">-</span></code> dash.</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+</div>
+</div>
+<div class="section" id="advanced-use-cases">
+<h2>Advanced Use Cases<a class="headerlink" href="#advanced-use-cases" title="Permalink to this headline">¶</a></h2>
+<p>For use cases that go beyond group level data, or that require special processing
+of the data gathering, <em>vmt-report</em> supports full customization of both the handler
+and worker components.</p>
+<div class="section" id="connection-handler">
+<h3>Connection Handler<a class="headerlink" href="#connection-handler" title="Permalink to this headline">¶</a></h3>
+<p>The base handler <em>vmt-report</em> provides is the <a class="reference internal" href="reference.html#vmtreport.Connection" title="vmtreport.Connection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Connection</span></code></a>.
+The handler is responsible for establishing a connection to Turbonomic using the
+<a class="reference external" href="https://pypi.org/project/vmtconnect/">vmt-connect</a> module, and returns a <a class="reference external" href="https://turbonomic.github.io/vmt-connect/vmtconnect.html#vmtconnect.Connection" title="(in vmt-connect v3.2.6)"><code class="xref py py-class docutils literal notranslate"><span class="pre">vmtconnect.Connection</span></code></a> object.
+Coupled with a customer worker process, detailed below, permits complete access
+to the Turbonomic API. The handler requires only an authentication directive
+and supports any that return either a username and password, or an auth string,
+including the <strong>basic</strong>, <strong>auth</strong>, <strong>env</strong>, and <em>vmt-report</em> supplied <strong>credstore</strong>.</p>
+</div>
+<div class="section" id="credstore-authentication">
+<h3>Credstore Authentication<a class="headerlink" href="#credstore-authentication" title="Permalink to this headline">¶</a></h3>
+<p><em>vmt-report</em> includes an additional authentication handler for accepting TurboCredStore
+style credentials. The</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text">Connection handler &amp; credstore authentication</span><a class="headerlink" href="#id5" title="Permalink to this code">¶</a></div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;sources&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;handler&quot;</span><span class="p">:</span> <span class="s2">&quot;vmtconnect&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;resource&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;authentication&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;credstore&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;credential&quot;</span><span class="p">:</span> <span class="s2">&quot;./turbo.cred&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;keyfile&quot;</span><span class="p">:</span> <span class="s2">&quot;./turbo.keyfile&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;logging&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;DEBUG&quot;</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;report_timeout&quot;</span><span class="p">:</span> <span class="mi">60</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="custom-workers">
+<h3>Custom Workers<a class="headerlink" href="#custom-workers" title="Permalink to this headline">¶</a></h3>
+<p>A custom worker definition is required to make use of a <a class="reference internal" href="reference.html#vmtreport.Connection" title="vmtreport.Connection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Connection</span></code></a>
+handler. arbiter natively supports custom worker definitions by passing a function
+reference to the <a class="reference external" href="https://arbiter.readthedocs.io/en/latest/reference.html#arbiter.Process" title="(in arbiter v1.1.0)"><code class="xref py py-class docutils literal notranslate"><span class="pre">arbiter.Process</span></code></a> constructor. All workers are run as
+separate processes, and so the function must return data in a mergable format. If
+the data requires special attention to merge, the user is responsible for providing
+the proper <a class="reference external" href="https://arbiter.readthedocs.io/en/latest/reference.html#arbiter.Process.merge_results" title="(in arbiter v1.1.0)"><code class="xref py py-meth docutils literal notranslate"><span class="pre">arbiter.Process.merge_results()</span></code></a> overloaded method.</p>
+<div class="literal-block-wrapper docutils container" id="id6">
+<div class="code-block-caption"><span class="caption-text">Custom worker example.</span><a class="headerlink" href="#id6" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Dump selected fields from all market actions</span>
+<span class="kn">import</span> <span class="nn">arbiter</span>
+<span class="kn">import</span> <span class="nn">vmtreport</span>
+<span class="kn">import</span> <span class="nn">umsg</span>
+
+<span class="c1"># source worker sub-process must accept 3 parameters</span>
+<span class="k">def</span> <span class="nf">actions</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="n">umsg</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrieving data from </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;resource&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">)</span>
+
+    <span class="c1"># source.connect() gives us the vmt-connect.Connection instance returned by</span>
+    <span class="c1"># vmt-report; here we use the get_actions() method inline.</span>
+    <span class="c1"># Another use would be the standard vmt-connect idiom:</span>
+    <span class="c1">#   vmt = source.connection()</span>
+    <span class="c1">#   res = vmt.get_action()</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span><span class="o">.</span><span class="n">get_actions</span><span class="p">()</span>
+
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;createTime&#39;</span><span class="p">,</span> <span class="s1">&#39;actionType&#39;</span><span class="p">,</span> <span class="s1">&#39;details&#39;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[{</span><span class="n">x</span><span class="p">:</span> <span class="n">res</span><span class="p">[</span><span class="n">x</span><span class="p">]}</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">res</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">]</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+  <span class="n">report</span> <span class="o">=</span> <span class="n">arbiter</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="s1">&#39;report.config&#39;</span><span class="p">,</span> <span class="n">actions</span><span class="p">)</span>
+  <span class="n">report</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="reference.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="start.html" class="btn btn-neutral float-left" title="Getting Started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, R.A. Stern
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
