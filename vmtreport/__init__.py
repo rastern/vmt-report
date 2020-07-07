@@ -20,6 +20,8 @@ from operator import itemgetter as ig
 import re
 
 import arbiter
+import vmtconnect as vc
+import vmtreport.util as vu
 from .__about__ import (__author__, __copyright__, __description__,
                         __license__, __title__, __version__)
 
@@ -107,21 +109,21 @@ class Groups:
         config (dict): Dictionary of group configuration parameters.
     """
     __slots__ = [
-        'vmt',
+        'conn',
         'type',
         'stop_on_error',
         '_groups'
     ]
 
     def __init__(self, connection, config):
-        self.vmt = connection
+        self.conn = connection
         self.type = config['type'].lower()
         self.stop_on_error = config.get('stop_on_error', False)
 
         if config.get('names', None):
             self._groups = [self.group_id(n) for n in config['names']]
         elif self.type == 'cluster':
-            clusters = vmt.search(scopes=['Market'], types=['Cluster'])
+            clusters = self.conn.search(scopes=['Market'], types=['Cluster'])
             self._groups = [x['uuid'] for x in clusters]
 
     @property
@@ -137,7 +139,7 @@ class Groups:
             raise TypeError(f"Unknown type '{self.type}'")
 
         try:
-            return self.vmt.search(q=name, types=types)[0]['uuid']
+            return self.conn.search(q=name, types=types)[0]['uuid']
         except (KeyError, IndexError):
             if self.stop_on_error:
                 pass
@@ -196,11 +198,16 @@ class DataField:
         r_var = r'([\$\w]+)'
         _str = self.value
 
-        for token in [i for i in re.split(r_var, self.value) if i]:
-            if token[0] == '$':
-                _str = _str.replace(token, str(data[token[1:]]))
+        try:
+            for token in [i for i in re.split(r_var, self.value) if i]:
+                if token[0] == '$':
+                    _str = _str.replace(token, str(data[token[1:]]))
 
-        return vu.evaluate(_str)
+            return vu.evaluate(_str)
+        except ZeroDivisionError:
+            return 0
+        except KeyError:
+            return None
 
     def tree_get(self, data, _field=None):
         if not _field:
@@ -226,13 +233,13 @@ class GroupedDataReport:
         fields (list): List of field definition dictionaries.
     """
     __slots__ = [
-        'vmt',
+        'conn',
         'groups',
         'fields'
     ]
 
     def __init__(self, conn, groups, fields):
-        self.vmt = conn
+        self.conn = conn
         self.groups = Groups(conn, groups)
         self.fields = {f['id']: DataField(f) for f in fields}
 
@@ -244,7 +251,7 @@ class GroupedDataReport:
                 _data[f.id] = f.value
 
         elif type == FieldTypes.PROPERTY:
-            response = vmt.search(uuid=group)[0]
+            response = self.conn.search(uuid=group)[0]
 
             for f in [x for x in self.fields.values() if x.type == type]:
                 _data[f.id] = f.tree_get(response)
@@ -255,7 +262,11 @@ class GroupedDataReport:
                 and x.name in _commodities[related_type]
             ]
             stats = {x.name for x in _fields}
-            response = vmt.get_entity_stats(scope=[group], stats=stats, related_type=related_type)
+
+            if related_type == 'Cluster':
+                related_type = None
+
+            response = self.conn.get_entity_stats(scope=[group], stats=stats, related_type=related_type)
 
             # roll-up data as we go
             for p, v in vc.enumerate_stats(response):
@@ -272,6 +283,7 @@ class GroupedDataReport:
         environment, and generates the data set defined for this report.
         """
         data = []
+        from pprint import pprint
 
         for g in self.groups.ids:
             # properties & literals
@@ -286,6 +298,11 @@ class GroupedDataReport:
             for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
                 _row[f.id] = f.compute(_row)
 
+            # fill in gaps if any
+            for f in [x for x in self.fields.values() if x.label]:
+                if f.id not in _row:
+                    _row[f.id] = None
+
             data = [*data, _row]
 
         if sort:
@@ -294,7 +311,7 @@ class GroupedDataReport:
         # replace labels and order columns
         for i, row in enumerate(data):
             _row = OrderedDict()
-            for f in self.fields.values():
+            for f in [x for x in self.fields.values() if x.label]:
                 _row[f.label] = row[f.id]
 
             data[i] = _row
@@ -320,7 +337,6 @@ class Connection(arbiter.handlers.HttpHandler):
         Standard Arbiter interface implementation. Returns the connection
         instance.
         """
-        import vmtconnect as vc
         from requests.packages.urllib3 import disable_warnings
         from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
