@@ -82,3 +82,8 @@ if __name__ == '__main__':
   "process_timeout": 60
 }
 ```
+
+## Documentation
+
+The [user guide](https://rastern.github.io/vmt-report/userguide.html) is a
+good place to start. Detailed documentation is also available [here](https://rastern.github.io/vmt-connect).
