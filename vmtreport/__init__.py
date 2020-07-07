@@ -86,6 +86,7 @@ _commodities = {
 }
 
 
+
 class FieldTypes(Enum):
     #: Market commodities (stats)
     COMMODITY = 'commodity'
@@ -379,7 +380,6 @@ class GroupedData(Connection):
                                  self.options['groups'],
                                  self.options['fields']
                                 ).apply(sort=self.options.get('sortby', None))
-
 
 
 
