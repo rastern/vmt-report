@@ -16,7 +16,7 @@ with open(os.path.join(here, 'README.md'), 'r') as fp:
 requires = [
     'requests>=2.21.0',
     'vmtconnect>=3.2.3',
-    'arbiter>=1.0.1'
+    'arbiter>=1.1.0'
 ]
 
 setup(
@@ -41,4 +41,7 @@ setup(
     python_requires=">=3.6",
     install_requires=requires,
     license=about['__license__'],
+    entry_points={
+        'console_scripts': ['vmtreport=vmtreport.command_line:main']
+    }
 )
