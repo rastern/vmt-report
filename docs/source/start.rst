@@ -54,7 +54,7 @@ Contributors
 Author:
   * R.A. Stern
 
-Bug fixes and QA:
+QA:
   * Ray Mileo
 
 
