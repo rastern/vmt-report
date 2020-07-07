@@ -1,8 +1,8 @@
 # vmt-report: Reporting Helper
 
-*vmt-report* adds Turbonomic specific handlers for the [arbiter](https://github.com/rastern/arbiter) data handling package. This enabled Turbonomic API calls to be
-easily combined and manipulated into standardized output formats such as CSV,
-and JSON for data export or simple reporting needs.
+*vmt-report* adds [Turbonomic](https://www.turbonomic.com) specific handlers for
+the [arbiter](https://github.com/rastern/arbiter) data handling package. This
+enabled Turbonomic API calls to be easily combined and manipulated into standardized output formats such as CSV, and JSON for data export or simple reporting needs.
 
 
 ## Installation
