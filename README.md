@@ -86,4 +86,4 @@ if __name__ == '__main__':
 ## Documentation
 
 The [user guide](https://rastern.github.io/vmt-report/userguide.html) is a
-good place to start. Detailed documentation is also available [here](https://rastern.github.io/vmt-connect).
+good place to start. Detailed documentation is also available [here](https://rastern.github.io/vmt-report).
