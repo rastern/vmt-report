@@ -337,12 +337,12 @@ class Connection(arbiter.handlers.HttpHandler):
 
         self._connection = None
 
-    def connect(self):
+    def connect(self, force=False):
         """
         Standard Arbiter interface implementation. Returns the connection
         instance.
         """
-        if self._connection:
+        if self._connection and not force:
             return self._connection
 
         from requests.packages.urllib3 import disable_warnings
