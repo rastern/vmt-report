@@ -330,14 +330,21 @@ class Connection(arbiter.handlers.HttpHandler):
         **kwargs: Additional handler specific options. These will override any
             in the `config` options.
     """
+    __slots__ = ['_connection']
+
     def __init__(self, config, **kwargs):
         super().__init__(config, **kwargs)
+
+        self._connection = None
 
     def connect(self):
         """
         Standard Arbiter interface implementation. Returns the connection
         instance.
         """
+        if self._connection:
+            return self._connection
+
         from requests.packages.urllib3 import disable_warnings
         from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -347,11 +354,12 @@ class Connection(arbiter.handlers.HttpHandler):
 
         if isinstance(__auth, dict):
             if 'auth' in __auth:
-                return vc.Connection(self.host, auth=__auth['auth'])
+                self._connection = vc.Connection(self.host, auth=__auth['auth'])
             elif 'username' in __auth and 'password' in __auth:
-                return vc.Connection(self.host,
-                                     username=__auth['username'],
-                                     password=__auth['password'])
+                self._connection = vc.Connection(self.host,
+                                                 username=__auth['username'],
+                                                 password=__auth['password'])
+            return self._connection
 
         raise TypeError('Unknown authorization object returned.')
 
@@ -371,12 +379,14 @@ class GroupedData(Connection):
     def __init__(self, config, **kwargs):
         super().__init__(config, **kwargs)
 
+        self.connect()
+
     def get(self):
         """
         Standard Arbiter interface implementation. Returns the grouped and sorted
         data report based on the config.
         """
-        return GroupedDataReport(self.connect(),
+        return GroupedDataReport(self._connection,
                                  self.options['groups'],
                                  self.options['fields']
                                 ).apply(sort=self.options.get('sortby', None))
