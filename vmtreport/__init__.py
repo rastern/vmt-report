@@ -124,8 +124,15 @@ class Groups:
         if config.get('names', None):
             self._groups = [self.group_id(n) for n in config['names']]
         elif self.type == 'cluster':
-            clusters = self.conn.search(scopes=['Market'], types=['Cluster'])
-            self._groups = [x['uuid'] for x in clusters]
+            clusters = self.conn.search(scopes=['Market'],
+                                        types=['Cluster'],
+                                        nocache=True,
+                                        pager=True)
+            self._groups = []
+
+            while not clusters.complete:
+                data = cluster.next
+                self._groups.extends([x['uuid'] for x in data])
 
     @property
     def ids(self):
@@ -394,9 +401,7 @@ class GroupedData(Connection):
 
 
 def auth_credstore(obj):
-    from turbo_api_creds import TurboCredStore
-
-    return {'auth': TurboCredStore().decrypt(obj['credential'], obj['keyfile'])}
+    return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
 
 
 def multikeysort(items, columns):
