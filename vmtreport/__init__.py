@@ -401,6 +401,8 @@ class GroupedData(Connection):
 
 
 def auth_credstore(obj):
+    from vmtconnect.security import Credential
+    
     return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
 
 
