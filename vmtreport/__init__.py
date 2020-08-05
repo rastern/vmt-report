@@ -124,8 +124,15 @@ class Groups:
         if config.get('names', None):
             self._groups = [self.group_id(n) for n in config['names']]
         elif self.type == 'cluster':
-            clusters = self.conn.search(scopes=['Market'], types=['Cluster'])
-            self._groups = [x['uuid'] for x in clusters]
+            clusters = self.conn.search(scopes=['Market'],
+                                        types=['Cluster'],
+                                        nocache=True,
+                                        pager=True)
+            self._groups = []
+
+            while not clusters.complete:
+                data = cluster.next
+                self._groups.extends([x['uuid'] for x in data])
 
     @property
     def ids(self):
@@ -330,14 +337,21 @@ class Connection(arbiter.handlers.HttpHandler):
         **kwargs: Additional handler specific options. These will override any
             in the `config` options.
     """
+    __slots__ = ['_connection']
+
     def __init__(self, config, **kwargs):
         super().__init__(config, **kwargs)
 
-    def connect(self):
+        self._connection = None
+
+    def connect(self, force=False):
         """
         Standard Arbiter interface implementation. Returns the connection
         instance.
         """
+        if self._connection and not force:
+            return self._connection
+
         from requests.packages.urllib3 import disable_warnings
         from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -347,11 +361,12 @@ class Connection(arbiter.handlers.HttpHandler):
 
         if isinstance(__auth, dict):
             if 'auth' in __auth:
-                return vc.Connection(self.host, auth=__auth['auth'])
+                self._connection = vc.Connection(self.host, auth=__auth['auth'])
             elif 'username' in __auth and 'password' in __auth:
-                return vc.Connection(self.host,
-                                     username=__auth['username'],
-                                     password=__auth['password'])
+                self._connection = vc.Connection(self.host,
+                                                 username=__auth['username'],
+                                                 password=__auth['password'])
+            return self._connection
 
         raise TypeError('Unknown authorization object returned.')
 
@@ -371,12 +386,14 @@ class GroupedData(Connection):
     def __init__(self, config, **kwargs):
         super().__init__(config, **kwargs)
 
+        self.connect()
+
     def get(self):
         """
         Standard Arbiter interface implementation. Returns the grouped and sorted
         data report based on the config.
         """
-        return GroupedDataReport(self.connect(),
+        return GroupedDataReport(self._connection,
                                  self.options['groups'],
                                  self.options['fields']
                                 ).apply(sort=self.options.get('sortby', None))
@@ -384,9 +401,9 @@ class GroupedData(Connection):
 
 
 def auth_credstore(obj):
-    from turbo_api_creds import TurboCredStore
-
-    return {'auth': TurboCredStore().decrypt(obj['credential'], obj['keyfile'])}
+    from vmtconnect.security import Credential
+    
+    return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
 
 
 def multikeysort(items, columns):
