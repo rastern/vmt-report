@@ -151,8 +151,8 @@ including the **basic**, **auth**, **env**, and *vmt-report* supplied **credstor
 Credstore Authentication
 ------------------------
 
-*vmt-report* includes an additional authentication handler for accepting TurboCredStore
-style credentials. The
+*vmt-report* includes an additional authentication handler for accepting *vmt-connect*
+style credentials.
 
 .. literalinclude:: ./_static/example_3-connection.conf
   :language: json

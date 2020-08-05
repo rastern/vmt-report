@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>User Guide &mdash; vmt-report 1.1.0 documentation</title>
+  <title>User Guide &mdash; vmt-report 1.2.0 documentation</title>
   
 
   
@@ -61,7 +61,7 @@
             
             
               <div class="version">
-                1.1.0
+                1.2.0
               </div>
             
           
@@ -385,7 +385,7 @@ and worker components.</p>
 <h3>Connection Handler<a class="headerlink" href="#connection-handler" title="Permalink to this headline">¶</a></h3>
 <p>The base handler <em>vmt-report</em> provides is the <a class="reference internal" href="reference.html#vmtreport.Connection" title="vmtreport.Connection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Connection</span></code></a>.
 The handler is responsible for establishing a connection to Turbonomic using the
-<a class="reference external" href="https://pypi.org/project/vmtconnect/">vmt-connect</a> module, and returns a <a class="reference external" href="https://turbonomic.github.io/vmt-connect/vmtconnect.html#vmtconnect.Connection" title="(in vmt-connect v3.2.6)"><code class="xref py py-class docutils literal notranslate"><span class="pre">vmtconnect.Connection</span></code></a> object.
+<a class="reference external" href="https://pypi.org/project/vmtconnect/">vmt-connect</a> module, and returns a <a class="reference external" href="https://turbonomic.github.io/vmt-connect/reference.html#vmtconnect.Connection" title="(in vmt-connect v3.4.0)"><code class="xref py py-class docutils literal notranslate"><span class="pre">vmtconnect.Connection</span></code></a> object.
 Coupled with a customer worker process, detailed below, permits complete access
 to the Turbonomic API. The handler requires only an authentication directive
 and supports any that return either a username and password, or an auth string,
@@ -393,8 +393,8 @@ including the <strong>basic</strong>, <strong>auth</strong>, <strong>env</strong
 </div>
 <div class="section" id="credstore-authentication">
 <h3>Credstore Authentication<a class="headerlink" href="#credstore-authentication" title="Permalink to this headline">¶</a></h3>
-<p><em>vmt-report</em> includes an additional authentication handler for accepting TurboCredStore
-style credentials. The</p>
+<p><em>vmt-report</em> includes an additional authentication handler for accepting <em>vmt-connect</em>
+style credentials.</p>
 <div class="literal-block-wrapper docutils container" id="id5">
 <div class="code-block-caption"><span class="caption-text">Connection handler &amp; credstore authentication</span><a class="headerlink" href="#id5" title="Permalink to this code">¶</a></div>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
