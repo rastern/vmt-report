@@ -131,8 +131,8 @@ class Groups:
             self._groups = []
 
             while not clusters.complete:
-                data = cluster.next
-                self._groups.extends([x['uuid'] for x in data])
+                data = clusters.next
+                self._groups.extend([x['uuid'] for x in data])
 
     @property
     def ids(self):
@@ -402,7 +402,7 @@ class GroupedData(Connection):
 
 def auth_credstore(obj):
     from vmtconnect.security import Credential
-    
+
     return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
 
 
