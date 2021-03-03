@@ -37,7 +37,7 @@ look like this:
 Handlers are free to define their own configuration parameters, and the documentation
 for the specific handler being used should be consulted for such information.
 The two handlers *vmt-report* defines, :py:class:`~vmtreport.GroupedData` and
-:py:class:`~vmtreport.Connection`, are documented.
+:py:class:`~vmtreport.Connection`, as detailed below.
 
 |
 
@@ -48,7 +48,7 @@ The :py:class:`~vmtreport.GroupedData` provides basic data processing
 capabilities based on groups (including clusters) within Turbonomic. The handler
 utilizes a list of groups, and a list of field definitions. Optionally a third
 list of sorting parameters may be included. The resultant data is a mapped dataset
-represented by an :py:class:`collections.OrderedDict`.
+represented by a :py:class:`collections.OrderedDict`.
 
 .. literalinclude:: ./_static/example_2-cluster.conf
   :language: json

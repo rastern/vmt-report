@@ -1,4 +1,4 @@
-# Copyright 2020 Turbonomic
+# Copyright 2020-2021 Turbonomic
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from enum import Enum
 from functools import cmp_to_key
 from operator import itemgetter as ig
 import re
+import traceback
 
 import arbiter
 import vmtconnect as vc
@@ -27,17 +28,8 @@ from .__about__ import (__author__, __copyright__, __description__,
 
 
 
-__all__ = [
-    '__author__',
-    '__copyright__',
-    '__description__',
-    '__license__',
-    '__title__',
-    '__version__',
-    'Connection',
-    'GroupedData',
-    'auth_credstore'
-]
+
+.0
 
 _commodities = {
     'Cluster': [
@@ -85,6 +77,28 @@ _commodities = {
     ]
 }
 
+_template_resources = {
+    'computeResources': [
+        'cpuConsumedFactor',
+        'cpuSpeed',
+        'ioThroughput',
+        'memoryConsumedFactor',
+        'memorySize',
+        'networkThroughput',
+        'numOfCpu'
+    ],
+    'infrastructureResources': [
+        'coolingSize',
+        'powerSize',
+        'spaceSize'
+    ],
+    'storageResources': [
+        'diskConsumedFactor',
+        'diskIops',
+        'diskSize'
+    ]
+}
+
 
 
 class FieldTypes(Enum):
@@ -92,10 +106,12 @@ class FieldTypes(Enum):
     COMMODITY = 'commodity'
     #: Computed fields
     COMPUTED = 'computed'
-    #: String literal
-    STRING = 'string'
     #: Static entity properties
     PROPERTY = 'property'
+    #: String literal
+    STRING = 'string'
+    #: Template resource field, clusters only
+    TEMPLATE = 'template'
 
 
 # data groups (clusters or entity groups)
@@ -150,9 +166,10 @@ class Groups:
             return self.conn.search(q=name, types=types)[0]['uuid']
         except (KeyError, IndexError):
             if self.stop_on_error:
-                pass
+                raise ValueError(f"Unable to locate '{name}'")
 
-            raise ValueError(f"Unable to locate '{name}'")
+            pass
+
 
 
 # data fields
@@ -195,13 +212,14 @@ class DataField:
         self.name = None
         self.label = config.get('label', None)
 
-        if self.type == FieldTypes.COMMODITY:
+        if self.type in (FieldTypes.COMMODITY, FieldTypes.TEMPLATE):
             self.name, self.value = config['value'].split(':', maxsplit=1)
-        elif self.type in (FieldTypes.PROPERTY, FieldTypes.COMPUTED):
+        elif self.type in (FieldTypes.PROPERTY, FieldTypes.COMPUTED, FieldTypes.STRING):
             self.value = config['value']
         else:
             raise TypeError(f"Unknown type '{self.type}'")
 
+    # resolve a compute field value
     def compute(self, data):
         r_var = r'([\$\w]+)'
         _str = self.value
@@ -217,6 +235,7 @@ class DataField:
         except KeyError:
             return None
 
+    # parse a colon reference tree for the proper value
     def tree_get(self, data, _field=None):
         if not _field:
             _field = self.value
@@ -239,8 +258,10 @@ class GroupedDataReport:
         conn (:py:class:`~vmtconnect.Connection`): Connection object.
         groups (dict): Groups definition.
         fields (list): List of field definition dictionaries.
+        period (string): Epoch period to pull stats for. Default: CURRENT
     """
     __slots__ = [
+        '__cache',
         'conn',
         'groups',
         'fields'
@@ -250,38 +271,74 @@ class GroupedDataReport:
         self.conn = conn
         self.groups = Groups(conn, groups)
         self.fields = {f['id']: DataField(f) for f in fields}
+        self.__cache = {x: {'stats': {}, 'template': {}, 'property': {}}
+                        for x in self.groups.ids}
 
+    # populate data for a given group
     def _get_group_data(self, group, type, related_type=None):
         _data = {'_id': group}
 
-        if type == FieldTypes.STRING:
-            for f in [x for x in self.fields.values() if x.type == type]:
-                _data[f.id] = f.value
+        try:
+            if type == FieldTypes.STRING:
+                for f in [x for x in self.fields.values() if x.type == type]:
+                    _data[f.id] = f.value
 
-        elif type == FieldTypes.PROPERTY:
-            response = self.conn.search(uuid=group)[0]
+            elif type == FieldTypes.PROPERTY:
+                if not self.__cache[group]['property']:
+                    self.__cache[group]['property'] = self.conn.search(uuid=group)[0]
 
-            for f in [x for x in self.fields.values() if x.type == type]:
-                _data[f.id] = f.tree_get(response)
+                for f in [x for x in self.fields.values() if x.type == type]:
+                    _data[f.id] = f.tree_get(self.__cache[group]['property'])
 
-        elif type == FieldTypes.COMMODITY:
-            _fields = [x for x in self.fields.values()
-                if x.type == type
-                and x.name in _commodities[related_type]
-            ]
-            stats = {x.name for x in _fields}
+            elif type == FieldTypes.COMMODITY:
+                def current(value):
+                    return True if value['epoch'] == 'CURRENT' else False
 
-            if related_type == 'Cluster':
-                related_type = None
+                _fields = [x for x in self.fields.values()
+                    if x.type == type and x.name in _commodities[related_type]
+                ]
+                stats = {x.name for x in _fields}
+                idx = related_type
+                func = None
 
-            response = self.conn.get_entity_stats(scope=[group], stats=stats, related_type=related_type)
+                if related_type == 'Cluster':
+                    related_type = None
+                    func = current
 
-            # roll-up data as we go
-            for p, v in vc.enumerate_stats(response):
-                for f in [x for x in _fields if x.name == v['name']]:
-                    _data[f.id] = _data.get(f.id, 0) + f.tree_get(v)
-        else:
-            return None
+                if _fields:
+                    if not self.__cache[group]['stats'].get(idx):
+                        self.__cache[group]['stats'][idx] = self.conn.get_entity_stats(scope=[group], stats=stats, related_type=related_type)
+
+                    # roll-up data as we go (gets all commodity fields)
+                    for p, v in vc.util.enumerate_stats(self.__cache[group]['stats'][idx], period=func):
+                        for f in [x for x in _fields if x.name == v['name']]:
+                            _data[f.id] = _data.get(f.id, 0) + f.tree_get(v)
+
+            elif type == FieldTypes.TEMPLATE:
+                _fields = [x for x in self.fields.values()
+                    if x.type == type and x.name in _template_resources[related_type]
+                ]
+
+                if _fields:
+                    if not self.__cache[group]['property']:
+                        self.__cache[group]['property'] = self.conn.search(uuid=group)[0]
+
+                    target = self.__cache[group]['property']['source']['displayName']
+                    cluster = self.__cache[group]['property']['displayName'].replace('\\', '_')
+                    tname = f"{target}::AVG:{cluster} for last 10 days"
+
+                    if not self.__cache[group]['template']:
+                        self.__cache[group]['template'] = self.conn.get_template_by_name(tname)
+
+                    if self.__cache[group]['template'] is None:
+                        print(f"Missing template data for {tname}")
+                    else:
+                        for p, v in vc.util.enumerate_template_resources(self.__cache[group]['template'], restype=lambda x: x == related_type):
+                            for f in [x for x in _fields if x.name == v['name']]:
+                                _data[f.id] = f.tree_get(v)
+
+        except Exception as e:
+            traceback.print_exc()
 
         return _data
 
@@ -294,13 +351,17 @@ class GroupedDataReport:
         from pprint import pprint
 
         for g in self.groups.ids:
-            # properties & literals
+            # populate properties & literals
             _row = self._get_group_data(g, FieldTypes.STRING)
             _row = {**_row, **self._get_group_data(g, FieldTypes.PROPERTY)}
 
-            # commodities
+            # populate commodities
             for c in _commodities:
                 _row = {**_row, **self._get_group_data(g, FieldTypes.COMMODITY, c)}
+
+            # populate template resources
+            for t in _template_resources:
+                _row = {**_row, **self._get_group_data(g, FieldTypes.TEMPLATE, t)}
 
             # build calculated fields
             for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
@@ -395,7 +456,7 @@ class GroupedData(Connection):
         """
         return GroupedDataReport(self._connection,
                                  self.options['groups'],
-                                 self.options['fields']
+                                 self.options['fields'],
                                 ).apply(sort=self.options.get('sortby', None))
 
 
