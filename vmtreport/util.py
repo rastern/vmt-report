@@ -1,4 +1,4 @@
-# Copyright 2020 Turbonomic
+# Copyright 2020-2021 Turbonomic
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 
 import ast
 from decimal import Decimal
+import math
 
 
 
@@ -54,10 +55,10 @@ INVALID_FUNC = (
 
 
 
-class SafeEval(ast.NodeTransformer):
+class _SafeEval(ast.NodeTransformer):
     """A wrapper for :class:`ast.NodeTransformer`.
 
-    :py:class:`~SafeEval` provides extension to :py:class:`ast.NodeTransformer` for
+    :py:class:`~_SafeEval` provides extension to :py:class:`ast.NodeTransformer` for
     the purpose of parsing custom domain specific languages required in client
     configurations. In practice this class should not be used directly.
 
@@ -65,7 +66,7 @@ class SafeEval(ast.NodeTransformer):
         :py:class:`ast.NodeTransformer`.
     """
     def visit_Call(self, node):
-        if node.func.id.lower() in INVALID_FUNC:
+        if isinstance(node.func, ast.Name) and node.func.id.lower() in INVALID_FUNC:
             raise NameError("name '{}' is not defined".format(node.func.id))
 
         return node
@@ -82,11 +83,11 @@ def evaluate(exp, local_map={}):
     Returns:
         Expression result.
     """
-    tree = SafeEval().visit(ast.parse(exp, mode='eval'))
+    tree = _SafeEval().visit(ast.parse(exp, mode='eval'))
     ast.fix_missing_locations(tree)
     cobj = compile(tree, '<ast>', 'eval')
 
-    return eval(cobj, {}, local_map)
+    return eval(cobj, {'math': math}, local_map)
 
 
 def unit_cast(value, ufrom, uto, factor, unit_list, precision=False):
