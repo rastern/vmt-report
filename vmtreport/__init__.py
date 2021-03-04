@@ -28,8 +28,17 @@ from .__about__ import (__author__, __copyright__, __description__,
 
 
 
-
-.0
+__all__ = [
+    '__author__',
+    '__copyright__',
+    '__description__',
+    '__license__',
+    '__title__',
+    '__version__',
+    'Connection',
+    'GroupedData',
+    'auth_credstore'
+]
 
 _commodities = {
     'Cluster': [
