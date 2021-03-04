@@ -15,7 +15,7 @@ with open(os.path.join(here, 'README.md'), 'r') as fp:
 
 requires = [
     'requests>=2.21.0',
-    'vmtconnect>=3.4.0',
+    'vmtconnect>=3.5.3',
     'arbiter>=1.1.0'
 ]
 
