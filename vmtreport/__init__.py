@@ -12,18 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # libraries
-
-from collections import OrderedDict
-from functools import cmp_to_key
-from operator import itemgetter as ig
-import re
-import traceback
-
 import arbiter
 import vmtconnect as vc
 import vmtreport.util as vu
 from vmtreport import stats
 from vmtreport import actions
+from vmtreport import targets
 from .__about__ import (__author__, __copyright__, __description__,
                         __license__, __title__, __version__)
 
@@ -74,17 +68,26 @@ class Connection(arbiter.handlers.HttpHandler):
         disable_warnings(InsecureRequestWarning)
 
         __auth = arbiter.get_auth(self.authentication)
+        kwargs = {}
 
         if isinstance(__auth, dict):
-            if 'auth' in __auth:
-                self._connection = vc.Connection(self.host, auth=__auth['auth'])
-            elif 'username' in __auth and 'password' in __auth:
-                self._connection = vc.Connection(self.host,
-                                                 username=__auth['username'],
-                                                 password=__auth['password'])
-            return self._connection
+            kwargs['auth'] = __auth['auth']
+        else:
+            raise TypeError('Unknown authorization object returned.')
 
-        raise TypeError('Unknown authorization object returned.')
+        if 'disable_hateoas' in self.options:
+            kwargs['disable_hateoas'] = self.options['disable_hateoas']
+
+        kwargs['ssl'] = self.secure
+        _host = f"{self.host}:{self.port}"
+
+        try:
+            self._connection = vc.Session(_host, **kwargs)
+        except vc.VMTConnectionError as e:
+            print(f"Connection Error: {e}")
+            exit(0)
+        except Exception:
+            raise
 
 
 class GroupedData(Connection):
@@ -109,15 +112,14 @@ class GroupedData(Connection):
         Standard Arbiter interface implementation. Returns the grouped and sorted
         data report based on the config.
         """
-        return stats.GroupedDataReport(self._connection,
-                                       self.options['groups'],
-                                       self.options['fields'],
-                                      ).apply()
+        return stats.GroupedDataReport(self._connection, self.options).apply()
 
 
 class ActionData(Connection):
     """
-    Action handler.
+    Data handler based on vmt-connect to pull and aggregate actions data based
+    on Turbonomic scopes (markets, groups, entities). The handler accepts a list
+    of field definitions used to determine the output of the report.
 
     Arguments:
         config (dict): Dictionary of handler configuration data
@@ -137,32 +139,31 @@ class ActionData(Connection):
         return actions.ActionDataReport(self._connection, self.options).apply()
 
 
+class TargetData(Connection):
+    """
+    """
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+
+        self.connect()
+
+    def get(self):
+        """
+        Standard Arbiter interface implementation. Returns the grouped and sorted
+        data report based on the config.
+        """
+        return actions.TargetDataReport(self._connection, self.options).apply()
+
+
 def auth_credstore(obj):
     from vmtconnect.security import Credential
 
     return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
 
 
-def multikeysort(items, columns):
-    comparers = [
-        ((ig(col[1:].strip()), -1) if col.startswith('-') else (ig(col.strip()), 1))
-        for col in columns
-    ]
-
-    def cmp(x, y):
-        return (x > y) - (x < y)
-
-    def comparer(left, right):
-        comparer_iter = (
-            cmp(fn(left), fn(right)) * mult
-            for fn, mult in comparers
-        )
-        return next((result for result in comparer_iter if result), 0)
-    return sorted(items, key=cmp_to_key(comparer))
-
-
 
 arbiter.HANDLERS.register('vmtconnect', Connection)
 arbiter.HANDLERS.register('vmtgroupeddata', GroupedData)
 arbiter.HANDLERS.register('vmtactiondata', ActionData)
+#arbiter.HANDLERS.register('vmtactiondata', TargetData)
 arbiter.AUTH.register('credstore', auth_credstore)

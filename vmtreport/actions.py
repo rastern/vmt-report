@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # libraries
+from collections import OrderedDict
 from collections.abc import Iterable
 from enum import Enum
 import json
@@ -19,6 +20,7 @@ import json
 import vmtconnect as vc
 
 from .common import FieldTypes, DataField, Options
+from .util import multikeysort
 
 
 
@@ -69,6 +71,8 @@ class ScopeTypes(Enum):
     GROUP = 'group'
     #: Entities
     ENTITY = 'entity'
+    #: Targets
+    TARGET = 'target'
 
 
 # data groups (clusters or entity groups)
@@ -122,6 +126,8 @@ class Scope:
             return ScopeTypes.ENTITY
         elif self.__try_method(self.conn.get_groups, uuid=self.uuid):
             return ScopeTypes.GROUP
+        elif self.__try_method(self.conn.get_targets, uuid=self.uuid):
+            return ScopeTypes.TARGET
         else:
             return None
 
@@ -132,21 +138,21 @@ class ActionSet:
         'conn',
         'dto',
         'filter',
-        'response_filter',
+        'resp_filter',
         'scope',
         'stop_error',
     ]
 
-    def __init__(self, connection, scope, dto=None, response_filter=None, stop_error=False):
+    def __init__(self, connection, scope, filter=None, response_filter=None, stop_error=False):
         self.conn = connection
         self.scope = Scope(self.conn, scope, stop_error)
-        self.response_filter = response_filter
+        self.resp_filter = response_filter
         self.stop_error = stop_error
 
-        if dto and isinstance(dto, FilterSet):
-            self.dto = dto.values
+        if filter and isinstance(filter, FilterSet):
+            self.dto = filter.values
         else:
-            self.dto = dto
+            self.dto = filter
 
     @staticmethod
     def __call(conn, scope, response_filter, post_data=None):
@@ -167,6 +173,8 @@ class ActionSet:
             _vc_method = conn.get_entity_actions
         elif scope.type == ScopeTypes.GROUP:
             _vc_method = conn.get_group_actions
+        elif scope.type == ScopeTypes.TARGET:
+            _vc_method = conn.get_target_actions
         else:
             raise TypeError(f"Unknown type {scope.type} for action data")
 
@@ -174,7 +182,7 @@ class ActionSet:
 
     def get_actions(self):
         actions = []
-        resp = self.__call(self.conn, self.scope, self.response_filter, self.dto)
+        resp = self.__call(self.conn, self.scope, self.resp_filter, self.dto)
 
         try:
             while not resp.complete:
@@ -199,37 +207,39 @@ class ActionDataReport:
         fields (list): List of field definition dictionaries.
     """
     __slots__ = [
-        '__cache',
+        '__sets',
         'conn',
         'fields',
         'filters',
-        'response_filter'
+        'resp_filter',
+        'sortby',
+        'stop_error'
     ]
 
     def __init__(self, conn, options):
         self.conn = conn
-        self.fields = {f['id']: DataField(f) for f in options[Options.FIELDS]}
-        self.response_filter = self._response_filter()
+        self.fields = {f['id']: DataField(f) for f in options[Options.FIELDS.value]}
+        self.resp_filter = self._response_filter()
         self.filters = None
-        self.sortby = options.get(Options.SORTBY)
-        self.stop_error = options[Options.STOP_ERROR]
-        self.sets = {}
+        self.sortby = options.get(Options.SORTBY.value)
+        self.stop_error = options[Options.STOP_ERROR.value]
+        self.__sets = {}
 
-        if options.get(Options.FILTERS):
-            self.filters = FilsterSet(options[Options.FILTERS])
+        if options.get(Options.FILTERS.value):
+            self.filters = FilterSet(options[Options.FILTERS.value])
 
         try:
-            #if Options.SCOPES in self.filters:
-            if self.filters:
-                scopes = self.filters[Options.SCOPES]
+            if options[Options.FILTERS.value]:
+                scopes = options[Options.FILTERS.value][Options.SCOPES.value]
             else:
                 scopes = _default_scope
 
             for s in scopes:
-                self.sets[s['id']] = ActionSet(
+                self.__sets[s['id']] = ActionSet(
                     self.conn,
+                    s,
                     FilterSet(s.get('filters'), self.filters),
-                    self.response_filter,
+                    self.resp_filter,
                     self.stop_error
                 )
         except Exception:
@@ -241,7 +251,7 @@ class ActionDataReport:
     def _response_filter(self):
         filter = []
 
-        for f in self.fields:
+        for f in self.fields.values():
             if f.type == FieldTypes.PROPERTY:
                 filter.append(f.value.replace(':', '.'))
 
@@ -253,27 +263,28 @@ class ActionDataReport:
         environment, and generates the data set defined for this report.
         """
         data = []
-        #from pprint import pprint
 
-        for act in self.sets:
-            _cache = act['data'].get_actions()
-            _row = {}
+        for actionset in self.__sets.values():
+            _cache = actionset.get_actions()
 
-            # populate properties & literals
-            for f in [x for x in self.fields.values() if x.type == FieldTypes.STRING]:
-                _row[f.id] = f.value
+            for action in _cache:
+                _row = {}
 
-            for f in [x for x in self.fields.values() if x.type == FieldTypes.PROPERTY]:
-                _row[f.id] = f.tree_get(_cache)
+                # populate properties & literals
+                for f in [x for x in self.fields.values() if x.type == FieldTypes.STRING]:
+                    _row[f.id] = f.value
 
-            # build calculated fields
-            for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
-                _row[f.id] = f.compute(_row)
+                for f in [x for x in self.fields.values() if x.type == FieldTypes.PROPERTY]:
+                    _row[f.id] = f.tree_get(action)
 
-            data = [*data, _row]
+                # build calculated fields
+                for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
+                    _row[f.id] = f.compute(_row)
+
+                data = [*data, _row]
 
         if self.sortby:
-            data = multikeysort(data, self.sortby)
+           data = multikeysort(data, self.sortby)
 
         # replace labels and order columns
         for i, row in enumerate(data):

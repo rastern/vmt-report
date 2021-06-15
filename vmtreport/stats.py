@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # libraries
+from collections import OrderedDict
+import traceback
 
 from .common import FieldTypes, DataField, Options
+from .util import multikeysort
 
 
 _commodities = {
@@ -255,7 +258,6 @@ class GroupedDataReport:
         environment, and generates the data set defined for this report.
         """
         data = []
-        #from pprint import pprint
 
         for g in self.groups.ids:
             # populate properties & literals
