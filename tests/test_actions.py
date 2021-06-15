@@ -1,5 +1,6 @@
 #
 # NOTES:
+#   Set disable_hateoas=False in all connections
 #
 import pytest
 import warnings
@@ -43,6 +44,7 @@ class TestScope:
     market = {'id': '777777', 'type': 'market'}
     entity = {'id': '73431571655824', 'type': 'entity'}
     group = {'id': '284783189570898', 'type': 'group'}
+    target = {'id': '73645133796016', 'type': 'target'}
 
     @classmethod
     def setup_class(cls):
@@ -85,6 +87,13 @@ class TestScope:
         assert scope.type == va.ScopeTypes.GROUP
         assert scope.uuid == '284783189570898'
 
+    def test_target_lookup(self):
+        scope = va.Scope(self.conn, self.target)
+
+        assert isinstance(scope.type, va.ScopeTypes)
+        assert scope.type == va.ScopeTypes.TARGET
+        assert scope.uuid == '73645133796016'
+
     def test_error(self):
         with pytest.raises(ValueError):
             scope = va.Scope(self.conn, self.default_false, stop_error=True)
@@ -105,7 +114,7 @@ class TestActionSet:
 
         assert isinstance(actionset.scope, va.Scope)
         assert actionset.dto is None
-        assert actionset.response_filter is None
+        assert actionset.resp_filter is None
         assert actionset.stop_error is False
 
     def test_dto(self):
@@ -118,6 +127,7 @@ class TestActionSet:
         actionset = va.ActionSet(self.conn, self.market_scope)
         data = actionset.get_actions()
 
+        # action-base
         assert len(data) == 482
 
     def test_get_actions_response_filter(self):
@@ -127,12 +137,22 @@ class TestActionSet:
 
         assert len(data) == 482
 
+        # check all filter fields are valid
+        assert len(data[0]) == len(resp_filter)
+        
         for f in resp_filter:
             assert f in data[0]
 
+        # action-base
         assert data[0]['uuid'] == '144268689476992'
         assert data[0]['actionType'] == 'RESIZE'
         assert data[0]['details'] == 'Resize down VMem for Virtual Machine dockervm01.demo.turbonomic.com from 2 GB to 1 GB'
+
+    def test_get_actions_scopes(self):
+
+        # action-scope-filter
+        pass
+
 
     def test_get_actions_error(self):
         dto = va.FilterSet(self.base_dto)
