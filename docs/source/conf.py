@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../../vmtreport'))
 # -- Project information -----------------------------------------------------
 
 project = 'vmt-report'
-copyright = '2020, R.A. Stern'
+copyright = '2020-2021, Turbonomic'
 author = 'R.A. Stern'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -26,9 +26,9 @@ author = 'R.A. Stern'
 # built documents.
 #
 # The short X.Y version.
-version = u'1.2.3'
+version = u'2.0.0'
 # The full version, including alpha/beta/rc tags.
-release = u'1.2.3'
+release = u'2.0.0'
 
 
 # -- General configuration ---------------------------------------------------
