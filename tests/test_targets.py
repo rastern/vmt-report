@@ -25,7 +25,7 @@ class TestTargets:
             cls.conn = vc.Connection(SERVER, auth=SERVER_AUTH, ssl=False, disable_hateoas=False)
 
     def test_init(self):
-        targets = va.Targets(self.conn, self.empty_config)
+        targets = va.Targets(self.conn)
 
         assert targets.resp_filter is None
         assert targets.stop_error is False
@@ -37,13 +37,13 @@ class TestTargets:
 
     def test_get_targets_response_filter(self):
         resp_filter = ['uuid', 'displayName', 'status', 'lastValidated', 'category', 'type']
-        targets = va.Targets(self.conn, self.empty_config, resp_filter)
+        targets = va.Targets(self.conn, resp_filter)
         data = targets.get()
 
         assert len(data) == 15
 
         # check all filter fields are valid
-        assert len(data[0]) == len(resp_filter)
+        assert len(data[0].keys()) == len(resp_filter)
 
         for f in resp_filter:
             assert f in data[0]
