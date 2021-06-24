@@ -38,7 +38,7 @@ setup(
     packages=find_packages(),
     package_data={'': ['LICENSE', 'NOTICE']},
     include_package_data=True,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=requires,
     license=about['__license__'],
     entry_points={
