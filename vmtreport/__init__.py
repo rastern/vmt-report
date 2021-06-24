@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # libraries
-
-from collections import OrderedDict
-from enum import Enum
-from functools import cmp_to_key
-from operator import itemgetter as ig
+import base64
+from email.message import EmailMessage
+from email.utils import COMMASPACE
+import mimetypes
 import re
-import traceback
+import smtplib
 
 import arbiter
 import vmtconnect as vc
-import vmtreport.util as vu
+from vmtconnect.security import Credential
+
+from vmtreport import common
+from vmtreport import stats
+from vmtreport import actions
+from vmtreport import targets
 from .__about__ import (__author__, __copyright__, __description__,
                         __license__, __title__, __version__)
 
@@ -40,361 +44,25 @@ __all__ = [
     'auth_credstore'
 ]
 
-_commodities = {
-    'Cluster': [
-        'CPUHeadroom',
-        'MemHeadroom',
-        'numContainers',
-        'numHosts',
-        'numStorages',
-        'numVDCs',
-        'numVMs',
-        'StorageHeadroom',
-    ],
-    'PhysicalMachine': [
-        'Ballooning',
-        'CPU',
-        'CPUAllocation',
-        'CPUProvisioned',
-        'HOST_LUN_ACCESS',
-        'IOThroughput',
-        'Mem',
-        'MemAllocation',
-        'MemProvisioned',
-        'numCPUs',
-        'numSockets',
-        'NetThroughput',
-        'Q1VCPU',
-        'Q2VCPU',
-        'Q4VCPU',
-        'Q8VCPU',
-        'Q16VCPU',
-        'Q32VCPU',
-        'Swapping'
-    ],
-    'Storage': [
-        'StorageAccess',
-        'StorageAmount',
-        'StorageLatency',
-        'StorageProvisioned'
-    ],
-    'VirtualMachine': [
-        'numVCPUs',
-        'VCPU',
-        'VMem',
-        'VStorage'
-    ]
-}
+EMAIL_HTML_HEAD = '''
+<!DOCTYPE html PUBLIC “-//W3C//DTD XHTML 1.0 Transitional//EN” “https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd”>
+<html xmlns=“https://www.w3.org/1999/xhtml”>
+<head>
+<title>{SUBJECT}</title>
+<meta http–equiv=“Content-Type” content=“text/html; charset=UTF-8” />
+<meta http–equiv=“X-UA-Compatible” content=“IE=edge” />
+<meta name=“viewport” content=“width=device-width, initial-scale=1.0 “ />
+<style>
+{STYLE}
+</style>
+</head>
+<body>
+'''
+EMAIL_HTML_FOOT = '''
+</body>
+</html>
+'''
 
-_template_resources = {
-    'computeResources': [
-        'cpuConsumedFactor',
-        'cpuSpeed',
-        'ioThroughput',
-        'memoryConsumedFactor',
-        'memorySize',
-        'networkThroughput',
-        'numOfCpu'
-    ],
-    'infrastructureResources': [
-        'coolingSize',
-        'powerSize',
-        'spaceSize'
-    ],
-    'storageResources': [
-        'diskConsumedFactor',
-        'diskIops',
-        'diskSize'
-    ]
-}
-
-
-
-class FieldTypes(Enum):
-    #: Market commodities (stats)
-    COMMODITY = 'commodity'
-    #: Computed fields
-    COMPUTED = 'computed'
-    #: Static entity properties
-    PROPERTY = 'property'
-    #: String literal
-    STRING = 'string'
-    #: Template resource field, clusters only
-    TEMPLATE = 'template'
-
-
-# data groups (clusters or entity groups)
-# all groups must be of the same type
-class Groups:
-    """Provides scope to a :py:class:`~vmtreport.GroupedDataReport` handler. This
-    may be either of type **cluster**, or **group**, and optionally may contain a list of
-    names/uuids.
-
-    Arguments:
-        connection (:py:class:`~vmtconnect.Connection`): vmtconnect Connection class
-        config (dict): Dictionary of group configuration parameters.
-    """
-    __slots__ = [
-        'conn',
-        'type',
-        'stop_on_error',
-        '_groups'
-    ]
-
-    def __init__(self, connection, config):
-        self.conn = connection
-        self.type = config['type'].lower()
-        self.stop_on_error = config.get('stop_on_error', False)
-
-        if config.get('names', None):
-            self._groups = [self.group_id(n) for n in config['names']]
-        elif self.type == 'cluster':
-            clusters = self.conn.search(scopes=['Market'],
-                                        types=['Cluster'],
-                                        nocache=True,
-                                        pager=True)
-            self._groups = []
-
-            while not clusters.complete:
-                data = clusters.next
-                self._groups.extend([x['uuid'] for x in data])
-
-    @property
-    def ids(self):
-        return self._groups
-
-    def group_id(self, name):
-        if self.type.lower() == 'group':
-            types = ['Group']
-        elif self.type.lower() == 'cluster':
-            types = ['Cluster']
-        else:
-            raise TypeError(f"Unknown type '{self.type}'")
-
-        try:
-            return self.conn.search(q=name, types=types)[0]['uuid']
-        except (KeyError, IndexError):
-            if self.stop_on_error:
-                raise ValueError(f"Unable to locate '{name}'")
-
-            pass
-
-
-
-# data fields
-class DataField:
-    """Report field representation. Each field must contain an **id**, **type**,
-    and **value**. The **label** field is optional, and should only be set for
-    fields that are to be represented in the output; all other fields will be
-    truncated after calculated fields processing. Calculated fields are processed
-    after all commodity and property fields are populated. The id field can be
-    any valid string containing numbers and letters, and may be referenced by
-    calculated fields.
-
-    Arguments:
-        config (dict): Field configuration dictionary.
-
-    Attributes:
-        id (str): Field's unique identifier.
-        type (:py:class:`~vmtreport.FieldTypes`): Field type used to determine how
-            the value is retrieved.
-        name (str): Applies to commodities only. This is the Turbonomic commodity
-            name used by the system. *Commodity names are case sensitive.*
-        value (str): Resolution path in the API DTO for the value, if a commodity
-            or property value, elsewise this is the expression for generating the
-            calculated field. Other fields are referenced by prepending their
-            **id** with $.
-        label (str): Column display header for this field. Only fields with a
-            non-null **label** will be returned in the dataset.
-    """
-    __slots__ = [
-        'id',
-        'type',
-        'name',
-        'value',
-        'label'
-    ]
-
-    def __init__(self, config):
-        self.id = config['id']
-        self.type = FieldTypes(config['type'])
-        self.name = None
-        self.label = config.get('label', None)
-
-        if self.type in (FieldTypes.COMMODITY, FieldTypes.TEMPLATE):
-            self.name, self.value = config['value'].split(':', maxsplit=1)
-        elif self.type in (FieldTypes.PROPERTY, FieldTypes.COMPUTED, FieldTypes.STRING):
-            self.value = config['value']
-        else:
-            raise TypeError(f"Unknown type '{self.type}'")
-
-    # resolve a compute field value
-    def compute(self, data):
-        r_var = r'([\$\w]+)'
-        _str = self.value
-
-        try:
-            for token in [i for i in re.split(r_var, self.value) if i]:
-                if token[0] == '$':
-                    _str = _str.replace(token, str(data[token[1:]]))
-
-            return vu.evaluate(_str)
-        except ZeroDivisionError:
-            return 0
-        except KeyError:
-            return None
-
-    # parse a colon reference tree for the proper value
-    def tree_get(self, data, _field=None):
-        if not _field:
-            _field = self.value
-
-        keys = _field.split(':', maxsplit=1)
-
-        if len(keys) > 1:
-            return self.tree_get(data[keys[0]], keys[1])
-
-        return data[keys[0]]
-
-
-# data aggregator
-class GroupedDataReport:
-    """
-    Data processor for generating tabular data from group or cluster properties,
-    statistical data (commodities), and custom calculated fields.
-
-    Arguments:
-        conn (:py:class:`~vmtconnect.Connection`): Connection object.
-        groups (dict): Groups definition.
-        fields (list): List of field definition dictionaries.
-        period (string): Epoch period to pull stats for. Default: CURRENT
-    """
-    __slots__ = [
-        '__cache',
-        'conn',
-        'groups',
-        'fields'
-    ]
-
-    def __init__(self, conn, groups, fields):
-        self.conn = conn
-        self.groups = Groups(conn, groups)
-        self.fields = {f['id']: DataField(f) for f in fields}
-        self.__cache = {x: {'stats': {}, 'template': {}, 'property': {}}
-                        for x in self.groups.ids}
-
-    # populate data for a given group
-    def _get_group_data(self, group, type, related_type=None):
-        _data = {'_id': group}
-
-        try:
-            if type == FieldTypes.STRING:
-                for f in [x for x in self.fields.values() if x.type == type]:
-                    _data[f.id] = f.value
-
-            elif type == FieldTypes.PROPERTY:
-                if not self.__cache[group]['property']:
-                    self.__cache[group]['property'] = self.conn.search(uuid=group)[0]
-
-                for f in [x for x in self.fields.values() if x.type == type]:
-                    _data[f.id] = f.tree_get(self.__cache[group]['property'])
-
-            elif type == FieldTypes.COMMODITY:
-                def current(value):
-                    return True if value['epoch'] == 'CURRENT' else False
-
-                _fields = [x for x in self.fields.values()
-                    if x.type == type and x.name in _commodities[related_type]
-                ]
-                stats = {x.name for x in _fields}
-                idx = related_type
-                func = None
-
-                if related_type == 'Cluster':
-                    related_type = None
-                    func = current
-
-                if _fields:
-                    if not self.__cache[group]['stats'].get(idx):
-                        self.__cache[group]['stats'][idx] = self.conn.get_entity_stats(scope=[group], stats=stats, related_type=related_type)
-
-                    # roll-up data as we go (gets all commodity fields)
-                    for p, v in vc.util.enumerate_stats(self.__cache[group]['stats'][idx], period=func):
-                        for f in [x for x in _fields if x.name == v['name']]:
-                            _data[f.id] = _data.get(f.id, 0) + f.tree_get(v)
-
-            elif type == FieldTypes.TEMPLATE:
-                _fields = [x for x in self.fields.values()
-                    if x.type == type and x.name in _template_resources[related_type]
-                ]
-
-                if _fields:
-                    if not self.__cache[group]['property']:
-                        self.__cache[group]['property'] = self.conn.search(uuid=group)[0]
-
-                    target = self.__cache[group]['property']['source']['displayName']
-                    cluster = self.__cache[group]['property']['displayName'].replace('\\', '_')
-                    tname = f"{target}::AVG:{cluster} for last 10 days"
-
-                    if not self.__cache[group]['template']:
-                        self.__cache[group]['template'] = self.conn.get_template_by_name(tname)
-
-                    if self.__cache[group]['template'] is None:
-                        print(f"Missing template data for {tname}")
-                    else:
-                        for p, v in vc.util.enumerate_template_resources(self.__cache[group]['template'], restype=lambda x: x == related_type):
-                            for f in [x for x in _fields if x.name == v['name']]:
-                                _data[f.id] = f.tree_get(v)
-
-        except Exception as e:
-            traceback.print_exc()
-
-        return _data
-
-    def apply(self, sort=None):
-        """
-        Applies group (scope) boundaries and field definitions to the Turbonomic
-        environment, and generates the data set defined for this report.
-        """
-        data = []
-        from pprint import pprint
-
-        for g in self.groups.ids:
-            # populate properties & literals
-            _row = self._get_group_data(g, FieldTypes.STRING)
-            _row = {**_row, **self._get_group_data(g, FieldTypes.PROPERTY)}
-
-            # populate commodities
-            for c in _commodities:
-                _row = {**_row, **self._get_group_data(g, FieldTypes.COMMODITY, c)}
-
-            # populate template resources
-            for t in _template_resources:
-                _row = {**_row, **self._get_group_data(g, FieldTypes.TEMPLATE, t)}
-
-            # build calculated fields
-            for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
-                _row[f.id] = f.compute(_row)
-
-            # fill in gaps if any
-            for f in [x for x in self.fields.values() if x.label]:
-                if f.id not in _row:
-                    _row[f.id] = None
-
-            data = [*data, _row]
-
-        if sort:
-            data = multikeysort(data, sort)
-
-        # replace labels and order columns
-        for i, row in enumerate(data):
-            _row = OrderedDict()
-            for f in [x for x in self.fields.values() if x.label]:
-                _row[f.label] = row[f.id]
-
-            data[i] = _row
-
-        return data
 
 
 class Connection(arbiter.handlers.HttpHandler):
@@ -428,17 +96,26 @@ class Connection(arbiter.handlers.HttpHandler):
         disable_warnings(InsecureRequestWarning)
 
         __auth = arbiter.get_auth(self.authentication)
+        kwargs = {}
 
         if isinstance(__auth, dict):
-            if 'auth' in __auth:
-                self._connection = vc.Connection(self.host, auth=__auth['auth'])
-            elif 'username' in __auth and 'password' in __auth:
-                self._connection = vc.Connection(self.host,
-                                                 username=__auth['username'],
-                                                 password=__auth['password'])
-            return self._connection
+            kwargs['auth'] = __auth['auth']
+        else:
+            raise TypeError('Unknown authorization object returned.')
 
-        raise TypeError('Unknown authorization object returned.')
+        if 'disable_hateoas' in self.options:
+            kwargs['disable_hateoas'] = self.options['disable_hateoas']
+
+        kwargs['ssl'] = self.secure
+        _host = f"{self.host}:{self.port}"
+
+        try:
+            self._connection = vc.Session(_host, **kwargs)
+        except vc.VMTConnectionError as e:
+            print(f"Connection Error: {e}")
+            exit(0)
+        except Exception:
+            raise
 
 
 class GroupedData(Connection):
@@ -463,38 +140,269 @@ class GroupedData(Connection):
         Standard Arbiter interface implementation. Returns the grouped and sorted
         data report based on the config.
         """
-        return GroupedDataReport(self._connection,
-                                 self.options['groups'],
-                                 self.options['fields'],
-                                ).apply(sort=self.options.get('sortby', None))
+        return stats.GroupedDataReport(self._connection, self.options).apply()
+
+
+class ActionData(Connection):
+    """
+    Data handler based on vmt-connect to pull and aggregate actions data based
+    on Turbonomic scopes (markets, groups, entities). The handler accepts a list
+    of field definitions used to determine the output of the report.
+
+    Arguments:
+        config (dict): Dictionary of handler configuration data
+        **kwargs: Additional handler specific options. These will override any
+            in the `config` options.
+    """
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+
+        self.connect()
+
+    def get(self):
+        """
+        Standard Arbiter interface implementation. Returns the grouped and sorted
+        data report based on the config.
+        """
+        return actions.ActionDataReport(self._connection, self.options).apply()
+
+
+class TargetData(Connection):
+    """
+    Data handler for pulling Turbonomic Target infomration.
+
+    Arguments:
+        config (dict): Dictionary of handler configuration data
+        **kwargs: Additional handler specific options. These will override any
+            in the `config` options.
+    """
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+
+        self.connect()
+
+    def get(self):
+        """
+        Standard Arbiter interface implementation. Returns the grouped and sorted
+        data report based on the config.
+        """
+        return targets.TargetDataReport(self._connection, self.options).apply()
+
+
+class DataResource(arbiter.handlers.FileHandler):
+    """
+    Output data handler for preparing data for use as the email message body.
+    Requires use of a compatible Notification handler, as this handler does not
+    write to a file.
+
+    Arguments:
+        config (dict): Dictionary of handler configuration data
+        **kwargs: Additional handler specific options. These will override any
+            in the `config` options.
+    """
+    __slots__ = ['filename']
+
+    def __init__(self, config, **kwargs):
+        config['resource'] = ''
+        super().__init__(config, **kwargs)
+
+        self.filename = None
+        self.mimetype = self.options.get('type', 'text/plain')
+        self.encoding = self.options.get('encoding', 'base64')
+
+    def enc_txt(self):
+        if self.encoding:
+            return f";{self.encoding}"
+        else:
+            return ''
+
+    def encode(self, data):
+        if self.encoding == 'base64':
+            return base64.b64encode(data.encode())
+        elif self.encoding:
+            return data.encode(encoding=self.encoding)
+        else:
+            return data
+
+    def set(self, data):
+        """
+        Stores the conventional output in the 'filename' reference instead
+        of writing to file.
+        """
+        if not data:
+            pass
+
+        if 'fieldnames' not in self.options:
+            self.options['fieldnames'] = data[0].keys()
+
+        data = self.encode(common.format(
+                    self.options['format'].get('type', 'tabulate'),
+                    data,
+                    self.options['fieldnames'],
+                    self.options.get('format')
+                    )).decode()
+
+        self.filename = f"data:{self.mimetype}{self.enc_txt()},{data}"
+
+    def atexit(self):
+        pass
+
+
+class ExtendedEmailHandler(arbiter.handlers.EmailHandler):
+    """
+    An extension to the Arbiter EmailHandler. Adds HTML capability as well as
+    support for data: URI resource definitions.
+    """
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+
+        self._emailheaders.append('html_prologue')
+        self._emailheaders.append('html_epilogue')
+
+    @staticmethod
+    def get_data_type(resource):
+        try:
+            if resource.startswith('data:'):
+                m = re.search('(?:data:)([^;]+)(?:;(?:[\S]+))?,(?:.*)', resource)
+
+                return m[1]
+        except AttributeError:
+            pass
+
+        return resource
+
+    @staticmethod
+    def any_html(res_list):
+        for res in res_list:
+            if ExtendedEmailHandler.get_data_type(res) == 'text/html':
+                return True
+
+        return False
+
+    @staticmethod
+    def decode(resource):
+        try:
+            if resource.startswith('data:'):
+                # 1 - type, 2 - encoding, 3 - data
+                m = re.search('(?:data:)([^;]+)(?:;([\S]+))?,(.*)', resource)
+
+                if m[2] == 'base64':
+                    return base64.b64decode(m[3]).decode()
+                elif m[2]:
+                    return m[3].decode(encoding=m[2])
+                else:
+                    return m[3]
+        except AttributeError:
+            pass
+
+        return resource
+
+    @staticmethod
+    def get_body(body, resources):
+        _data = ''
+
+        for res in resources:
+            _data += ExtendedEmailHandler.decode(res)
+
+        return arbiter.parse_string(body, data=_data)
+
+    @staticmethod
+    def set_headers(msg, options, headers):
+        for k in options:
+            if k in headers:
+                if isinstance(options[k], list):
+                    msg[k] = arbiter.parse_string(COMMASPACE.join(options[k]))
+                else:
+                    msg[k] = arbiter.parse_string(options[k])
+
+        return msg
+
+    @staticmethod
+    def attach_files(msg, files):
+        for file in files:
+            ctype, encoding = mimetypes.guess_type(file)
+
+            # unknown, treat as binary
+            if ctype is None or encoding is not None:
+                ctype = 'application/octet-stream'
+
+            maintype, subtype = ctype.split('/', 1)
+
+            with open(file, 'rb') as fp:
+                msg.add_attachment(fp.read(),
+                               maintype=maintype,
+                               subtype=subtype,
+                               filename=os.path.basename(file))
+
+        return msg
+
+    def send(self):
+        msg = EmailMessage()
+        msg = self.set_headers(msg, self.options['email'], self._emailheaders)
+
+        if self.errors:
+            error_msg = '\n\n'.join([str(x) for x in self.errors])
+            body = self.options['email'].get('body_error', self.default_body_error)
+            msg.set_content(arbiter.parse_string(body, errors=error_msg))
+        else:
+            data = []
+            files = [x for x in self.files if x and not x.startswith('data:')]
+
+            if self.options.get('embed_data_resource', True):
+                data = [x for x in self.files if x and x.startswith('data:')]
+
+            subs = {
+                'STYLE': self.options.get('style', ''),
+                'SUBJECT': arbiter.parse_string(self.options['email']['subject'])
+            }
+            body = self.get_body(self.options['email']['body'], data)
+
+            if self.any_html(data) and self.options.get('html', False):
+                p = self.options['email'].get('html_prologue',
+                            arbiter.parse_string(EMAIL_HTML_HEAD, **subs))
+                e = self.options['email'].get('html_epilogue', EMAIL_HTML_FOOT)
+                msg.set_content(f"{p}{body}{e}", subtype='html')
+            else:
+                msg.set_content(body)
+
+            if files:
+                msg = self.attach_files(msg, files)
+
+        if self.options['smtp'].get('ssl', False):
+            klass = smtplib.SMTP_SSL
+        elif self.options['smtp'].get('lmtp', False):
+            klass = smtplib.LMTP
+        else:
+            klass = smtplib.SMTP
+
+        _smtp_opts = self._EmailHandler__smtp_options()
+
+        with klass(host=self.options['smtp']['host'], **_smtp_opts) as smtp:
+            if self.options['smtp'].get('tls', False):
+                tlsargs = {
+                    x: self.options['smtp'][x] for x in self.options['smtp']
+                        if x in ['keyfile', 'certfile']
+                }
+                smtp.starttls(**tlsargs)
+
+            if self.options['smtp'].get('username', None) \
+            and self.options['smtp'].get('password', None):
+                smtp.login(self.options['smtp']['username'], self.options['smtp']['password'])
+
+            smtp.send_message(msg)
 
 
 
 def auth_credstore(obj):
-    from vmtconnect.security import Credential
-
     return {'auth': Credential(obj['keyfile'], obj['credential']).decrypt()}
-
-
-def multikeysort(items, columns):
-    comparers = [
-        ((ig(col[1:].strip()), -1) if col.startswith('-') else (ig(col.strip()), 1))
-        for col in columns
-    ]
-
-    def cmp(x, y):
-        return (x > y) - (x < y)
-
-    def comparer(left, right):
-        comparer_iter = (
-            cmp(fn(left), fn(right)) * mult
-            for fn, mult in comparers
-        )
-        return next((result for result in comparer_iter if result), 0)
-    return sorted(items, key=cmp_to_key(comparer))
 
 
 
 arbiter.HANDLERS.register('vmtconnect', Connection)
 arbiter.HANDLERS.register('vmtgroupeddata', GroupedData)
+arbiter.HANDLERS.register('vmtactiondata', ActionData)
+arbiter.HANDLERS.register('vmttargetdata', TargetData)
+arbiter.HANDLERS.register('dataresource', DataResource)
+arbiter.HANDLERS.register('extendedemail', ExtendedEmailHandler)
+
 arbiter.AUTH.register('credstore', auth_credstore)
