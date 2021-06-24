@@ -15,7 +15,7 @@ with open(os.path.join(here, 'README.md'), 'r') as fp:
 
 requires = [
     'requests>=2.21.0',
-    'vmtconnect>=3.5.3',
+    'vmtconnect>=3.6.0.dev0',
     'arbiter>=1.1.0'
 ]
 
@@ -38,7 +38,7 @@ setup(
     packages=find_packages(),
     package_data={'': ['LICENSE', 'NOTICE']},
     include_package_data=True,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=requires,
     license=about['__license__'],
     entry_points={
