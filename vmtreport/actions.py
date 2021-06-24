@@ -219,7 +219,7 @@ class ActionDataReport:
     def __init__(self, conn, options):
         self.conn = conn
         self.fields = {f['id']: DataField(f) for f in options[Options.FIELDS.value]}
-        self.resp_filter = self._response_filter()
+        self.resp_filter = self._response_filter(options.get(Options.RESPONSE_FILTER.value))
         self.filters = None
         self.sortby = options.get(Options.SORTBY.value)
         self.stop_error = options[Options.STOP_ERROR.value]
@@ -248,12 +248,13 @@ class ActionDataReport:
             else:
                 pass
 
-    def _response_filter(self):
-        filter = []
+    def _response_filter(self, filter):
+        if not filter:
+            filter = []
 
-        for f in self.fields.values():
-            if f.type == FieldTypes.PROPERTY:
-                filter.append(f.value.replace(':', '.'))
+            for f in self.fields.values():
+                if f.type == FieldTypes.PROPERTY:
+                    filter.append(f.value.replace(':', '.'))
 
         return filter
 
