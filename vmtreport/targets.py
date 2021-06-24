@@ -40,14 +40,11 @@ class Targets:
         'stop_error'
     ]
 
-    def __init__(self, connection, config, response_filter=None, stop_error=False):
+    def __init__(self, connection, response_filter=None, stop_error=False):
         self.conn = connection
         self.stop_error = stop_error
         self.resp_filter = response_filter
         self._targets = []
-
-        if config.get('stop_on_error'):
-            self.stop_error = config['stop_on_error']
 
         self._get()
 
@@ -83,7 +80,7 @@ class TargetDataReport:
         fields (list): List of field definition dictionaries.
     """
     __slots__ = [
-        '__sets',
+        '__targets',
         'conn',
         'fields',
         'resp_filter',
@@ -94,25 +91,26 @@ class TargetDataReport:
     def __init__(self, conn, options):
         self.conn = conn
         self.fields = {f['id']: DataField(f) for f in options[Options.FIELDS.value]}
-        self.resp_filter = self._response_filter()
+        self.resp_filter = self._response_filter(options.get(Options.RESPONSE_FILTER.value))
         self.sortby = options.get(Options.SORTBY.value)
         self.stop_error = options[Options.STOP_ERROR.value]
 
         try:
-            self.__actions = Targets(self.conn, self.resp_filter, self.stop_error)
+            self.__targets = Targets(self.conn, self.resp_filter, self.stop_error)
         except Exception:
             if self.stop_error:
                 raise
             else:
-                self.__actions = {}
+                self.__targets = None
                 pass
 
-    def _response_filter(self):
-        filter = []
+    def _response_filter(self, filter):
+        if not filter:
+            filter = []
 
-        for f in self.fields.values():
-            if f.type == FieldTypes.PROPERTY:
-                filter.append(f.value.replace(':', '.'))
+            for f in self.fields.values():
+                if f.type == FieldTypes.PROPERTY:
+                    filter.append(f.value.replace(':', '.'))
 
         return filter
 
@@ -123,24 +121,21 @@ class TargetDataReport:
         """
         data = []
 
-        for target in self.__sets.values():
-            _cache = target.gets()
+        for target in self.__targets.get():
+            _row = {}
 
-            for action in _cache:
-                _row = {}
+            # populate properties & literals
+            for f in [x for x in self.fields.values() if x.type == FieldTypes.STRING]:
+                _row[f.id] = f.value
 
-                # populate properties & literals
-                for f in [x for x in self.fields.values() if x.type == FieldTypes.STRING]:
-                    _row[f.id] = f.value
+            for f in [x for x in self.fields.values() if x.type == FieldTypes.PROPERTY]:
+                _row[f.id] = f.tree_get(target)
 
-                for f in [x for x in self.fields.values() if x.type == FieldTypes.PROPERTY]:
-                    _row[f.id] = f.tree_get(action)
+            # build calculated fields
+            for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
+                _row[f.id] = f.compute(_row)
 
-                # build calculated fields
-                for f in [x for x in self.fields.values() if x.type == FieldTypes.COMPUTED]:
-                    _row[f.id] = f.compute(_row)
-
-                data = [*data, _row]
+            data = [*data, _row]
 
         if self.sortby:
            data = multikeysort(data, self.sortby)
