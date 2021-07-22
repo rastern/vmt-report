@@ -209,6 +209,7 @@ class DataResource(arbiter.handlers.FileHandler):
         self.filename = None
         self.mimetype = self.options.get('type', 'text/plain')
         self.encoding = self.options.get('encoding', 'base64')
+        self.nodata = self.options.get('nodata', "No data available")
 
     def enc_txt(self):
         if self.encoding:
@@ -229,18 +230,18 @@ class DataResource(arbiter.handlers.FileHandler):
         Stores the conventional output in the 'filename' reference instead
         of writing to file.
         """
-        if not data:
-            pass
+        if data:
+            if 'fieldnames' not in self.options:
+                self.options['fieldnames'] = data[0].keys()
 
-        if 'fieldnames' not in self.options:
-            self.options['fieldnames'] = data[0].keys()
-
-        data = self.encode(common.format(
-                    self.options['format'].get('type', 'tabulate'),
-                    data,
-                    self.options['fieldnames'],
-                    self.options.get('format')
-                    )).decode()
+            data = self.encode(common.format(
+                        self.options['format'].get('type', 'tabulate'),
+                        data,
+                        self.options['fieldnames'],
+                        self.options.get('format')
+                        )).decode()
+        else:
+            data = self.encode(self.nodata).decode()
 
         self.filename = f"data:{self.mimetype}{self.enc_txt()},{data}"
 

@@ -7,15 +7,20 @@ from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 
 about = {}
+
+# Bandit nosec - false positive
+# exec is used to load the contents of the __about__.py file into the about dict
+# and is used only in the creation of the python package metadata, not in
+# execution of package code - non-security related issue
 with open(os.path.join(here, 'vmtreport', '__about__.py'), 'r') as fp:
-    exec(fp.read(), about)
+    exec(fp.read(), about) # nosec
 
 with open(os.path.join(here, 'README.md'), 'r') as fp:
     readme = fp.read()
 
 requires = [
     'requests>=2.21.0',
-    'vmtconnect>=3.6.0.dev0',
+    'vmtconnect>=3.6.1',
     'arbiter>=1.1.0'
 ]
 
