@@ -20,12 +20,13 @@ import math
 from operator import itemgetter as ig
 
 
-
-INVALID_FUNC = (
+# all dunder names are implicitly excluded
+INVALID_NAMES = [
   'callable',
   'class',
   'classmethod',
   'compile',
+  'def',
   'del',
   'delattr',
   'dir',
@@ -53,43 +54,84 @@ INVALID_FUNC = (
   'repr',
   'setattr',
   'type'
-)
+]
+
+# we only need to specify expression classes, as the eval mode blocks statements
+# classes already
+INVALID_EXPR = [
+    'Await',
+    'GeneratorExp',
+    'Lambda',
+    'NamedExpr',
+    'Yield',
+    'YieldFrom'
+]
 
 
 
-class _SafeEval(ast.NodeTransformer):
-    """A wrapper for :class:`ast.NodeTransformer`.
+class SafeNodeCheck(ast.NodeVisitor):
+    """A wrapper for :class:`ast.NodeVisitor`.
 
-    :py:class:`~_SafeEval` provides extension to :py:class:`ast.NodeTransformer` for
+    :py:class:`~_SafeEval` provides extension to :py:class:`ast.NodeVisitor` for
     the purpose of parsing custom domain specific languages required in client
     configurations. In practice this class should not be used directly.
 
     See Also:
-        :py:class:`ast.NodeTransformer`.
+        :py:class:`ast.NodeVisitor`.
     """
-    def visit_Call(self, node):
-        if isinstance(node.func, ast.Name) and node.func.id.lower() in INVALID_FUNC:
-            raise NameError("name '{}' is not defined".format(node.func.id))
+    def __init__(self):
+        super().__init__()
 
-        return node
+        # block our unwanted expressions
+        for expr in INVALID_EXPR:
+            setattr(self, f'visit_{expr}', self.Invalid)
+
+    def generic_visit(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+
+    def Invalid(self, node):
+        raise SyntaxError('Invalid expression', ('', 1, 0, ''))
+
+    def visit_Name(self, node):
+        if node.id.lower() in INVALID_NAMES:
+            self.Invalid(node)
+
+        self.generic_visit(node)
 
 
-def evaluate(exp, local_map={}):
+
+def evaluate(exp):
     """Evaluates the expression ``exp`` and returns the results.
 
     Args:
         exp (str): Domain specific language expression to be evaluated.
-        local_map (dict): Dictionary of local function and variable mappings as
-            available to the DSL.
 
     Returns:
         Expression result.
     """
-    tree = _SafeEval().visit(ast.parse(exp, mode='eval'))
+    # squash object attribute reference attacks
+    if '__' in exp:
+        raise SyntaxError('Invalid expression', ('', 1, 0, ''))
+
+    # eval mode permits a single expression only, and natively blocks statements
+    # and assignments
+    tree = ast.parse(exp, mode='eval')
+    SafeNodeCheck().visit(tree)
     ast.fix_missing_locations(tree)
     cobj = compile(tree, '<ast>', 'eval')
 
-    return eval(cobj, {'math': math}, local_map)
+    # Bandit nosec - false positive
+    # All commands are first passed through SafeNodeCheck() which blocks unsafe
+    # methods such as import, exec, etc as defined in INVALID_NAMES.
+    #
+    # The intention is to expclicitly allow mathematical syntax parsing, without
+    # exposing other builtins, or permitting full scripts to run. Statements,
+    # assignments, dunderes, and use of any excluded callables will return
+    # SyntaxError.
+    #
+    # Note: user specified locals must not be passed to eval() as this would
+    # present a risk of exposing addional builtins.
+    return eval(cobj, {'math': math}, None) #nosec
 
 
 def unit_cast(value, ufrom, uto, factor, unit_list, precision=False):
@@ -110,10 +152,12 @@ def unit_cast(value, ufrom, uto, factor, unit_list, precision=False):
     Returns:
         Converted unit value.
     """
+    factor = Decimal(factor)
+    value = Decimal(value)
     offset = unit_list.index(uto) - unit_list.index(ufrom)
     chg = Decimal(pow(factor, abs(offset)))
 
-    res = value * chg if offset <= 0 else value * (1/chg)
+    res = value * chg if offset <= 0 else value * (Decimal(1)/chg)
 
     return round(res, precision) if precision else res
 
